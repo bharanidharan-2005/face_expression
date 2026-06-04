@@ -1,0 +1,29 @@
+# Use an official Python runtime as a parent image
+FROM python:3.9-slim
+
+# Install system dependencies required by OpenCV and MediaPipe
+RUN apt-get update && apt-get install -y \
+    ffmpeg \
+    libsm6 \
+    libxext6 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory inside the container
+WORKDIR /app
+
+# Copy and install python requirements
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Pre-download the deep learning weights so Render doesn't time out on first launch
+# This downloads the default VGG-Face / Facial Expression arrays
+RUN python -c "from deepface import DeepFace; import numpy as np; blank = np.zeros((224,224,3), dtype=np.uint8); try: DeepFace.analyze(blank, actions=['age', 'gender', 'emotion'], enforce_detection=False); except: pass"
+
+# Copy the rest of the application files
+COPY . .
+
+# Expose port for Flask
+EXPOSE 10000
+
+# Start the Flask app bound to Render's internal port configuration
+CMD ["gunicorn", "-b", "0.0.0.0:10000", "app:app"]
